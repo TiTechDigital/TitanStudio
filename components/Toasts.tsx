@@ -1,34 +1,23 @@
 "use client";
-import { AnimatePresence, motion } from "framer-motion";
-import { AlertTriangle, CheckCircle2, Info, X } from "lucide-react";
+import { X } from "lucide-react";
 import { useToasts } from "@/hooks/useToasts";
 
-const ICON = { success: CheckCircle2, error: AlertTriangle, info: Info } as const;
-const TONE = { success: "text-accent-soft", error: "text-danger", info: "text-mute" } as const;
+const BAR = { success: "bg-cobalt", error: "bg-danger", info: "bg-dim" } as const;
 
 export function Toasts() {
   const { toasts, dismiss } = useToasts();
   return (
-    <div aria-live="polite" className="pointer-events-none fixed bottom-5 right-5 z-50 flex w-[min(92vw,360px)] flex-col gap-2">
-      <AnimatePresence>
-        {toasts.map((t) => {
-          const Icon = ICON[t.kind];
-          return (
-            <motion.div
-              key={t.id} layout initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, x: 24 }} transition={{ duration: 0.18 }}
-              className="pointer-events-auto flex items-start gap-3 rounded-xl border border-white/10 bg-ink-800 p-3.5 shadow-2xl shadow-black/60"
-            >
-              <Icon size={16} className={`mt-0.5 shrink-0 ${TONE[t.kind]}`} />
-              <div className="min-w-0 flex-1">
-                <p className="text-[13px] font-medium text-fg">{t.title}</p>
-                {t.message && <p className="mt-0.5 break-words text-[12px] text-mute">{t.message}</p>}
-              </div>
-              <button onClick={() => dismiss(t.id)} aria-label="Dismiss" className="text-dim transition-colors hover:text-fg"><X size={14} /></button>
-            </motion.div>
-          );
-        })}
-      </AnimatePresence>
+    <div aria-live="polite" className="pointer-events-none fixed bottom-4 right-4 z-50 flex w-[min(92vw,340px)] flex-col gap-2">
+      {toasts.map((t) => (
+        <div key={t.id} className="pointer-events-auto flex overflow-hidden rounded-md border border-line-strong bg-raised shadow-lg shadow-black/40">
+          <span className={`w-1 shrink-0 ${BAR[t.kind]}`} />
+          <div className="min-w-0 flex-1 px-3 py-2.5">
+            <p className="text-[13px] font-medium text-fg">{t.title}</p>
+            {t.message && <p className="mt-0.5 break-words text-[12px] text-mute">{t.message}</p>}
+          </div>
+          <button onClick={() => dismiss(t.id)} aria-label="Dismiss" className="px-2.5 text-dim transition-colors hover:text-fg"><X size={14} /></button>
+        </div>
+      ))}
     </div>
   );
 }

@@ -3,74 +3,63 @@
 @tailwind utilities;
 
 :root { color-scheme: dark; }
-html, body { background: #04060C; color: #EAF0FF; }
+html, body { background: #0B1226; color: #E6ECFF; }
 body {
   font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
-  font-size: 14px;
+  font-size: 13.5px;
+  line-height: 1.45;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  background-image:
-    radial-gradient(1200px 600px at 12% -10%, rgba(59,130,255,.16), transparent 60%),
-    radial-gradient(900px 500px at 100% 110%, rgba(56,189,248,.10), transparent 60%);
-  background-attachment: fixed;
 }
 
-.grain::after {
-  content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .06; mix-blend-mode: overlay;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
-}
-
-:focus-visible { outline: 2px solid #3B82FF; outline-offset: 2px; }
-::selection { background: #3B82FF; color: #fff; }
+:focus-visible { outline: 2px solid #B7C7FF; outline-offset: 2px; }
+::selection { background: #2F5BFF; color: #fff; }
 
 @layer components {
-  .glass {
-    @apply border border-white/10 bg-ink-800/70 backdrop-blur-xl;
-  }
   .field {
-    @apply w-full rounded-xl border border-white/10 bg-ink-900/80 px-3 py-2.5 text-[13px] text-fg placeholder:text-dim
-           outline-none transition-colors hover:border-white/20 focus:border-accent/70 focus-visible:outline-none;
+    @apply w-full rounded-md border border-line-strong bg-night px-3 py-2 text-[13.5px] text-fg placeholder:text-dim
+           outline-none transition-colors hover:border-dim focus:border-cobalt;
+  }
+  select.field {
+    appearance: none;
+    padding-right: 28px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'><path d='M1 1l4 4 4-4' stroke='%238393BD' stroke-width='1.5' stroke-linecap='round'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+  }
+  .btn {
+    @apply inline-flex h-9 items-center justify-center gap-2 rounded-md border border-line-strong px-3.5 text-[13px] font-medium text-fg
+           transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-40;
   }
   .btn-primary {
-    @apply inline-flex h-12 items-center justify-center gap-2 rounded-full bg-gradient-to-b from-accent-soft to-accent px-7 text-[14px] font-semibold text-white
-           shadow-[0_0_0_1px_rgba(123,170,255,.5),0_8px_32px_-6px_rgba(59,130,255,.75)]
-           transition hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none;
+    @apply inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-cobalt px-5 text-[14px] font-semibold text-white
+           transition-colors hover:bg-cobalt-hover disabled:cursor-not-allowed disabled:bg-raised disabled:text-dim;
   }
-  .btn-ghost {
-    @apply inline-flex h-9 items-center justify-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3.5 text-[13px] font-medium
-           text-fg transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40;
-  }
-  .pill {
-    @apply inline-flex h-9 items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3.5 text-[12.5px] font-medium text-fg
-           transition-colors hover:bg-white/10 aria-expanded:border-accent/60 aria-expanded:bg-accent/15;
-  }
-  .seg { @apply grid gap-0.5 rounded-xl bg-ink-900/80 p-0.5; }
-  .seg-item { @apply rounded-[10px] px-2 py-1.5 text-center text-[12.5px] font-medium text-mute transition-colors hover:text-fg; }
-  .seg-item[aria-pressed="true"] { @apply bg-accent/20 text-accent-soft shadow-[inset_0_0_0_1px_rgba(59,130,255,.5)]; }
+  .seg { @apply grid gap-px overflow-hidden rounded-md border border-line-strong bg-line-strong; }
+  .seg-item { @apply bg-night px-2 py-2 text-center text-[12.5px] font-medium text-mute transition-colors hover:text-fg; }
+  .seg-item[aria-pressed="true"] { @apply bg-cobalt text-white; }
+  .num { font-family: var(--font-mono), ui-monospace, monospace; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
 }
 
-/* Range slider */
 input[type="range"].titan-range {
-  -webkit-appearance: none; appearance: none; width: 100%; height: 4px; border-radius: 9999px;
-  background: linear-gradient(to right, #3B82FF var(--p, 50%), #1F2A45 var(--p, 50%));
-  outline: none; cursor: pointer;
+  -webkit-appearance: none; appearance: none; width: 100%; height: 2px; background: #2C3E6B; outline: none; cursor: pointer;
+  background: linear-gradient(to right, #2F5BFF var(--p, 50%), #2C3E6B var(--p, 50%));
 }
 input[type="range"].titan-range::-webkit-slider-thumb {
-  -webkit-appearance: none; width: 16px; height: 16px; border-radius: 9999px; background: #fff;
-  box-shadow: 0 0 0 4px rgba(59,130,255,.35); cursor: pointer;
+  -webkit-appearance: none; width: 12px; height: 18px; border-radius: 2px; background: #E6ECFF; cursor: pointer; border: 0;
 }
 input[type="range"].titan-range::-moz-range-thumb {
-  width: 16px; height: 16px; border: 0; border-radius: 9999px; background: #fff;
-  box-shadow: 0 0 0 4px rgba(59,130,255,.35); cursor: pointer;
+  width: 12px; height: 18px; border-radius: 2px; background: #E6ECFF; cursor: pointer; border: 0;
 }
 input[type="range"].titan-range:focus-visible { outline-offset: 6px; }
 
-* { scrollbar-width: thin; scrollbar-color: #1F2A45 transparent; }
+* { scrollbar-width: thin; scrollbar-color: #2C3E6B transparent; }
 ::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-thumb { background: #1F2A45; border-radius: 9999px; }
+::-webkit-scrollbar-thumb { background: #2C3E6B; border-radius: 9999px; }
 
-select.field { appearance: none; background-image: none; }
+details > summary { list-style: none; cursor: pointer; }
+details > summary::-webkit-details-marker { display: none; }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  *, *::before, *::after { animation: none !important; transition-duration: 0.01ms !important; }
 }

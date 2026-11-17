@@ -2,25 +2,25 @@ import type { AspectId, ModelId, ResolutionId, StudioParams } from "./types";
 
 export const DIRECTOR_PILLS = {
   "Camera movement": [
-    { emoji: "🚁", label: "Drone flyover", text: "high aerial drone flyover shot" },
-    { emoji: "🎥", label: "Dolly push-in", text: "slow cinematic dolly push-in" },
-    { emoji: "🏎️", label: "Tracking shot", text: "fast smooth tracking shot following the subject" },
-    { emoji: "🔄", label: "360° orbit", text: "360-degree orbit around the subject" },
-    { emoji: "🔍", label: "Macro zoom", text: "extreme macro zoom, shallow depth of field" },
+    { label: "Drone flyover", text: "high aerial drone flyover shot" },
+    { label: "Dolly push-in", text: "slow cinematic dolly push-in" },
+    { label: "Tracking shot", text: "fast smooth tracking shot following the subject" },
+    { label: "360° orbit", text: "360-degree orbit around the subject" },
+    { label: "Macro zoom", text: "extreme macro zoom, shallow depth of field" },
   ],
   "Light & style": [
-    { emoji: "🌅", label: "Golden hour", text: "golden hour sunlight, warm rim light" },
-    { emoji: "🌧️", label: "Neon rain", text: "cyberpunk neon rain, wet reflective streets" },
-    { emoji: "🎞️", label: "35mm film", text: "shot on 35mm film, organic film grain" },
-    { emoji: "🕯️", label: "Film noir", text: "moody film noir, hard shadows, low-key lighting" },
+    { label: "Golden hour", text: "golden hour sunlight, warm rim light" },
+    { label: "Neon rain", text: "cyberpunk neon rain, wet reflective streets" },
+    { label: "35mm film", text: "shot on 35mm film, organic film grain" },
+    { label: "Film noir", text: "moody film noir, hard shadows, low-key lighting" },
   ],
 } as const;
 
 /** Presets drive the worker's Wan 14B pass (`wan_steps`, `wan_strength`). */
 export const MODELS: { id: ModelId; name: string; tag: string; desc: string; steps: number; strength: number }[] = [
-  { id: "turbo", name: "Turbo", tag: "Fastest", desc: "Quick preview, light cinema pass", steps: 10, strength: 0.45 },
-  { id: "cinema", name: "Cinema", tag: "Balanced", desc: "Recommended look and speed", steps: 18, strength: 0.6 },
-  { id: "ultra", name: "Ultra", tag: "Best", desc: "Maximum detail, slowest", steps: 28, strength: 0.7 },
+  { id: "turbo", name: "Fast", tag: "~2 min", desc: "Quick preview, light cinema pass", steps: 10, strength: 0.45 },
+  { id: "cinema", name: "Balanced", tag: "~4 min", desc: "Recommended look and speed", steps: 18, strength: 0.6 },
+  { id: "ultra", name: "Detailed", tag: "~6 min", desc: "Maximum detail, slowest", steps: 28, strength: 0.7 },
 ];
 
 export const ASPECTS: { id: AspectId; label: string; sub: string; ratio: number }[] = [
@@ -63,7 +63,7 @@ export const VOICE_CATALOG: { group: string; voices: Voice[] }[] = [
 
 /** `prompt` is sent to the worker as `music_prompt` (MusicGen). `none` sends nothing. */
 export const BGM_TRACKS: { id: string; name: string; prompt: string }[] = [
-  { id: "none", name: "No music", prompt: "" },
+  { id: "none", name: "None", prompt: "" },
   { id: "epic", name: "Epic cinematic", prompt: "epic cinematic orchestral score, deep drones, powerful drums, trailer music" },
   { id: "suspense", name: "Dark suspense", prompt: "dark suspense cello, tense atmospheric underscore, slow build" },
   { id: "synthwave", name: "Synthwave", prompt: "cyberpunk synthwave, pulsing analog bass, neon night drive" },
@@ -71,11 +71,11 @@ export const BGM_TRACKS: { id: string; name: string; prompt: string }[] = [
   { id: "ambient", name: "Ambient", prompt: "calm ambient pads, slow evolving texture, spacious" },
 ];
 
-export const EXAMPLES: { title: string; prompt: string; aspect: AspectId; hue: string }[] = [
-  { title: "Neon metropolis", prompt: "aerial drone shot flying over a neon-lit futuristic city at night, rain, reflective streets", aspect: "16:9", hue: "from-blue-600/50 via-indigo-700/30" },
-  { title: "Red dunes", prompt: "slow cinematic dolly push-in on a lone astronaut walking across red desert dunes, golden hour", aspect: "16:9", hue: "from-sky-500/40 via-blue-800/30" },
-  { title: "Water macro", prompt: "extreme macro of a water droplet splashing in slow motion, shallow depth of field, soft light", aspect: "9:16", hue: "from-cyan-500/40 via-blue-700/30" },
-  { title: "Samurai", prompt: "a samurai standing still as cherry blossoms fall around him, shot on 35mm film", aspect: "9:16", hue: "from-indigo-500/40 via-blue-900/30" },
+export const EXAMPLES: { prompt: string; aspect: AspectId }[] = [
+  { prompt: "Aerial drone shot over a neon-lit city at night, rain on reflective streets", aspect: "16:9" },
+  { prompt: "Slow dolly push-in on a lone astronaut walking across red desert dunes, golden hour", aspect: "16:9" },
+  { prompt: "Extreme macro of a water droplet splashing in slow motion, shallow depth of field", aspect: "9:16" },
+  { prompt: "A samurai stands still as cherry blossoms fall around him, shot on 35mm film", aspect: "9:16" },
 ];
 
 export const DEFAULT_PARAMS: StudioParams = {

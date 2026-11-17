@@ -77,6 +77,7 @@ export function useTitanAPI() {
   const [progress, setProgress] = useState(0);
   const [elapsedMs, setElapsedMs] = useState(0);
   const [etaMs, setEtaMs] = useState(0);
+  const [parts, setParts] = useState<Record<string, number>>({});
   const [result, setResult] = useState<TitanResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
@@ -170,6 +171,7 @@ export function useTitanAPI() {
     runStart.current = null;
     live.current = true;
     setEtaMs(m.etaMs);
+    setParts(m.parts);
     setElapsedMs(Date.now() - m.t0);
     setProgress(2);
     setStage(0);
@@ -242,6 +244,6 @@ export function useTitanAPI() {
     setStatus("idle"); setResult(null); setError(null); setProgress(0); setStage(0);
   }, []);
 
-  return { status, stage, progress, elapsedMs, etaMs, result, error, history, activeId, show, generate, cancel, reset };
+  return { status, stage, progress, elapsedMs, etaMs, parts, result, error, history, activeId, show, generate, cancel, reset };
 }
 
