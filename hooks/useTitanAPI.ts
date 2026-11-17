@@ -1,67 +1,44 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ASPECTS, framesFor, randomSeed } from "@/lib/constants";
+import { BGM_TRACKS, RESOLUTIONS, STAGES, estimateMs } from "@/lib/constants";
 import type { GenStatus, HistoryItem, StudioParams, TitanResult } from "@/lib/types";
 import { useToasts } from "./useToasts";
 
 /**
- * Talks to RunPod Serverless through the Next.js proxy at /api/titan, which forwards to
- *   https://api.runpod.ai/v2/{ENDPOINT_ID}/runsync   (and /status/{id} for long jobs)
+ * Talks to RunPod Serverless through the Next.js proxy at /api/titan:
+ *   POST -> /run, GET ?id= -> /status/{id}, DELETE ?id= -> /cancel/{id}
  * so the API key never reaches the browser.
  *
- * NOTE: `stage` is a client-side *estimate* (runsync is a single blocking call and does not
- * stream stage events). If your worker streams progress, swap the timer for real status data.
+ * Queue / in-progress state is real (from RunPod). The progress bar and stage names are ESTIMATES
+ * derived from the settings, because the worker does not stream stage events.
  */
 
-const ETA_MS: Record<StudioParams["model"], number> = { turbo: 20_000, ultra: 120_000, hybrid: 60_000 };
 const POLL_MS = 3000;
-const MAX_WAIT_MS = 15 * 60_000;
+const MAX_WAIT_MS = 30 * 60_000;
+const MAX_POLL_FAILS = 6;
+const JOB_KEY = "titan:job";
 
+interface JobMeta { id: string; t0: number; prompt: string; aspect: StudioParams["aspect"]; etaMs: number; parts: Record<string, number> }
+
+/** Maps UI params to the worker's `job["input"]` (see handler.py). */
 export function buildPayload(p: StudioParams) {
-  const asp = ASPECTS.find((a) => a.id === p.aspect)!;
-  return {
-    input: {
-      prompt: p.prompt.trim(),
-      negative_prompt: p.negativePrompt.trim(),
-      model: p.model,
-      duration_sec: p.durationSec,
-      num_frames: framesFor(p.durationSec),
-      fps: p.fps,
-      aspect_ratio: p.aspect,
-      width: asp.w,
-      height: asp.h,
-      motion_intensity: p.motion,
-      upscale_4k: p.upscale4k,
-      guidance_scale: p.guidance,
-      num_inference_steps: p.steps,
-      seed: p.seed,
-      audio: {
-        script: p.narration.trim(),
-        voice: p.voice,
-        rate_percent: p.speechRate,
-        pitch_hz: p.pitch,
-        bgm: p.bgm,
-        bgm_volume: p.bgmVolume / 100,
-        auto_duck_db: p.autoDuck ? -18 : 0,
-      },
-    },
+  const res = RESOLUTIONS.find((r) => r.id === p.resolution)!;
+  const music = BGM_TRACKS.find((t) => t.id === p.music);
+  const input: Record<string, unknown> = {
+    prompt: p.prompt.trim(),
+    wan_prompt: p.prompt.trim(),
+    aspect: p.aspect,
+    enable_4k: res.enable4k,
+    true_4k: res.true4k,
+    wan_steps: p.steps,
+    wan_strength: p.strength,
+    voice: p.voice,
+    tts: p.ttsEngine,
   };
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function parseOutput(out: any, seed: number, elapsedMs: number): TitanResult {
-  const o = out?.output ?? out;
-  if (o?.error) throw new Error(String(o.error));
-  const toUrl = (v?: string) => (v && !v.startsWith("http") && !v.startsWith("data:") ? `data:video/mp4;base64,${v}` : v);
-  const videoUrl = toUrl(o?.video_url ?? o?.video_4k_url ?? o?.video ?? o?.video_base64);
-  if (!videoUrl) throw new Error("Worker returned no video in `output`");
-  return {
-    videoUrl,
-    rawUrl: toUrl(o?.raw_video_url ?? o?.preview_url),
-    url4k: toUrl(o?.video_4k_url),
-    seed: typeof o?.seed === "number" ? o.seed : seed,
-    elapsedMs,
-  };
+  if (!p.autoDuration || !p.narration.trim()) input.duration = p.durationSec;
+  if (p.narration.trim()) input.narration = p.narration.trim();
+  if (music?.prompt) input.music_prompt = music.prompt;
+  return { input };
 }
 
 async function http(url: string, init?: RequestInit, signal?: AbortSignal) {
@@ -71,127 +48,200 @@ async function http(url: string, init?: RequestInit, signal?: AbortSignal) {
   return data;
 }
 
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+const clip = (s: unknown) => String(s ?? "").slice(0, 400);
+
+async function parseOutput(res: any, elapsedMs: number): Promise<TitanResult> { // eslint-disable-line @typescript-eslint/no-explicit-any
+  const o = res?.output ?? res;
+  if (o?.error) throw new Error(clip(o.error));
+  const src: string | undefined = o?.video_base64 ?? o?.video_url;
+  if (!src) throw new Error("Worker returned no video in `output`");
+  // data: URI -> blob: URL (cheaper for <video>, and downloads work)
+  const blob = await (await fetch(src)).blob();
+  return {
+    videoUrl: URL.createObjectURL(blob),
+    duration: o?.duration,
+    resolution: o?.resolution,
+    voiceUsed: o?.voice_used,
+    wanUsed: o?.wan_used,
+    esrganUsed: o?.esrgan_used,
+    workerSeconds: o?.seconds_taken,
+    elapsedMs,
+  };
+}
+
 export function useTitanAPI() {
   const { push } = useToasts();
   const [status, setStatus] = useState<GenStatus>("idle");
-  const [stage, setStage] = useState(0); // 0..3
-  const [progress, setProgress] = useState(0); // 0..100 (estimated)
+  const [stage, setStage] = useState(0);
+  const [progress, setProgress] = useState(0);
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const [etaMs, setEtaMs] = useState(0);
   const [result, setResult] = useState<TitanResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [activeId, setActiveId] = useState<number | null>(null);
+
   const abort = useRef<AbortController | null>(null);
-  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const meta = useRef<JobMeta | null>(null);
+  const runStart = useRef<number | null>(null); // when RunPod first reported IN_PROGRESS
+  const live = useRef(false);
 
-  const stopTimer = () => {
-    if (timer.current) clearInterval(timer.current);
-    timer.current = null;
-  };
-  useEffect(() => () => { stopTimer(); abort.current?.abort(); }, []);
-
-  const generate = useCallback(
-    async (params: StudioParams) => {
-      if (!params.prompt.trim()) {
-        push({ kind: "error", title: "Prompt required", message: "Describe your shot first." });
-        return;
+  // ticker: elapsed time + estimated progress/stage
+  useEffect(() => {
+    if (status !== "queued" && status !== "generating") return;
+    const id = setInterval(() => {
+      const m = meta.current;
+      if (!m) return;
+      setElapsedMs(Date.now() - m.t0);
+      if (!runStart.current) return;
+      const t = Date.now() - runStart.current;
+      setProgress(Math.max(2, 95 * (1 - Math.exp((-2.2 * t) / m.etaMs))));
+      let acc = 0, idx = 0;
+      for (let i = 0; i < STAGES.length; i++) {
+        acc += m.parts[STAGES[i].key] ?? 0;
+        idx = i;
+        if (t < acc) break;
       }
-      abort.current?.abort();
-      const ac = new AbortController();
-      abort.current = ac;
-      const seed = params.lockSeed ? params.seed : randomSeed();
-      const eta = ETA_MS[params.model];
-      const t0 = Date.now();
+      setStage(idx);
+    }, 400);
+    return () => clearInterval(id);
+  }, [status]);
 
-      setStatus("generating");
-      setError(null);
-      setResult(null);
-      setStage(0);
-      setProgress(2);
-      stopTimer();
-      timer.current = setInterval(() => {
-        const pct = Math.min(95, ((Date.now() - t0) / eta) * 95);
-        setProgress(pct);
-        setStage(Math.min(3, Math.floor(pct / 24)));
-      }, 400);
-
-      try {
-        const payload = buildPayload({ ...params, seed });
-        let res = await http("/api/titan", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        }, ac.signal);
-
-        // runsync may hand back an in-flight job; poll /status/{id}
-        while (res.status === "IN_QUEUE" || res.status === "IN_PROGRESS") {
-          if (Date.now() - t0 > MAX_WAIT_MS) throw new Error("Generation timed out");
-          await new Promise((r) => setTimeout(r, POLL_MS));
-          res = await http(`/api/titan?id=${encodeURIComponent(res.id)}`, undefined, ac.signal);
-        }
-        if (res.status === "FAILED" || res.status === "CANCELLED" || res.status === "TIMED_OUT") {
-          throw new Error(res.error || `Job ${String(res.status).toLowerCase()}`);
-        }
-
-        const parsed = parseOutput(res, seed, Date.now() - t0);
-        stopTimer();
-        setProgress(100);
-        setStage(3);
-        const id = Date.now();
-        setHistory((h) => [{ id, prompt: params.prompt.trim(), aspect: params.aspect, result: parsed }, ...h].slice(0, 12));
-        setActiveId(id);
-        setResult(parsed);
-        setStatus("completed");
-        push({ kind: "success", title: "Render complete", message: `Finished in ${(parsed.elapsedMs / 1000).toFixed(1)}s` });
-      } catch (e) {
-        stopTimer();
-        if (ac.signal.aborted) return;
-        const msg = e instanceof Error ? e.message : "Unknown error";
-        setError(msg);
-        setStatus("error");
-        push({ kind: "error", title: "Generation failed", message: msg });
-      }
-    },
-    [push]
-  );
-
-  const cancel = useCallback(() => {
-    abort.current?.abort();
-    stopTimer();
-    setStatus("idle");
-    setProgress(0);
-    push({ kind: "info", title: "Generation cancelled" });
+  const finish = useCallback(async (res: unknown, m: JobMeta) => {
+    const parsed = await parseOutput(res, Date.now() - m.t0);
+    const id = Date.now();
+    setHistory((h) => {
+      const next = [{ id, prompt: m.prompt, aspect: m.aspect, result: parsed }, ...h];
+      next.slice(12).forEach((x) => URL.revokeObjectURL(x.result.videoUrl));
+      return next.slice(0, 12);
+    });
+    setActiveId(id);
+    setResult(parsed);
+    setProgress(100);
+    setStatus("completed");
+    try { localStorage.removeItem(JOB_KEY); } catch {}
+    push({ kind: "success", title: "Render complete", message: `Finished in ${Math.round(parsed.elapsedMs / 1000)}s` });
   }, [push]);
 
-  const exportGif = useCallback(async () => {
-    if (!result) return;
+  const track = useCallback(async (m: JobMeta, ac: AbortController) => {
+    let fails = 0;
     try {
-      push({ kind: "info", title: "Exporting GIF…" });
+      for (;;) {
+        if (ac.signal.aborted) return;
+        if (Date.now() - m.t0 > MAX_WAIT_MS) throw new Error("Generation timed out");
+        let res;
+        try {
+          res = await http(`/api/titan?id=${encodeURIComponent(m.id)}`, undefined, ac.signal);
+          fails = 0;
+        } catch (e) {
+          if (ac.signal.aborted) return;
+          if (++fails >= MAX_POLL_FAILS) throw e;
+          await sleep(POLL_MS);
+          continue;
+        }
+        if (res.status === "IN_QUEUE") setStatus("queued");
+        else if (res.status === "IN_PROGRESS") {
+          if (!runStart.current) runStart.current = Date.now();
+          setStatus("generating");
+        } else if (res.status === "COMPLETED") {
+          await finish(res, m);
+          return;
+        } else if (["FAILED", "CANCELLED", "TIMED_OUT"].includes(res.status)) {
+          throw new Error(clip(res.error) || `Job ${String(res.status).toLowerCase().replace("_", " ")}`);
+        }
+        await sleep(POLL_MS);
+      }
+    } catch (e) {
+      if (ac.signal.aborted) return;
+      const msg = e instanceof Error ? e.message : "Unknown error";
+      try { localStorage.removeItem(JOB_KEY); } catch {}
+      setError(msg);
+      setStatus("error");
+      push({ kind: "error", title: "Generation failed", message: msg });
+    }
+  }, [finish, push]);
+
+  const begin = useCallback((m: JobMeta) => {
+    abort.current?.abort();
+    const ac = new AbortController();
+    abort.current = ac;
+    meta.current = m;
+    runStart.current = null;
+    live.current = true;
+    setEtaMs(m.etaMs);
+    setElapsedMs(Date.now() - m.t0);
+    setProgress(2);
+    setStage(0);
+    setError(null);
+    setResult(null);
+    setStatus("queued");
+    try { localStorage.setItem(JOB_KEY, JSON.stringify(m)); } catch {}
+    void track(m, ac);
+  }, [track]);
+
+  // resume a job after a page refresh (RunPod keeps results ~30 min)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(JOB_KEY);
+      if (!raw) return;
+      const m = JSON.parse(raw) as JobMeta;
+      if (!m?.id || Date.now() - m.t0 > MAX_WAIT_MS) { localStorage.removeItem(JOB_KEY); return; }
+      begin(m);
+    } catch {}
+    return () => abort.current?.abort();
+  }, [begin]);
+
+  const generate = useCallback(async (params: StudioParams) => {
+    if (!params.prompt.trim()) {
+      push({ kind: "error", title: "Prompt required", message: "Describe your shot first." });
+      return;
+    }
+    abort.current?.abort();
+    const ac = new AbortController();
+    abort.current = ac;
+    setStatus("queued");
+    setError(null);
+    setResult(null);
+    setProgress(0);
+    setElapsedMs(0);
+    try {
       const res = await http("/api/titan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ input: { action: "export_gif", video_url: result.videoUrl } }),
-      });
-      const o = res?.output ?? res;
-      const url = o?.gif_url ?? (o?.gif_base64 ? `data:image/gif;base64,${o.gif_base64}` : null);
-      if (!url) throw new Error("Worker did not return a GIF (add an `export_gif` action to your handler)");
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "titan-v1.gif";
-      a.click();
-      push({ kind: "success", title: "GIF exported" });
+        body: JSON.stringify(buildPayload(params)),
+      }, ac.signal);
+      if (!res.id) throw new Error(clip(res.error) || "RunPod did not return a job id");
+      const est = estimateMs(params);
+      begin({ id: res.id, t0: Date.now(), prompt: params.prompt.trim(), aspect: params.aspect, etaMs: est.total, parts: est.parts });
     } catch (e) {
-      push({ kind: "error", title: "GIF export failed", message: e instanceof Error ? e.message : undefined });
+      if (ac.signal.aborted) return;
+      const msg = e instanceof Error ? e.message : "Unknown error";
+      setError(msg);
+      setStatus("error");
+      push({ kind: "error", title: "Could not start render", message: msg });
     }
-  }, [result, push]);
+  }, [begin, push]);
+
+  const cancel = useCallback(() => {
+    const id = meta.current?.id;
+    abort.current?.abort();
+    try { localStorage.removeItem(JOB_KEY); } catch {}
+    if (id) void fetch(`/api/titan?id=${encodeURIComponent(id)}`, { method: "DELETE" }).catch(() => {});
+    setStatus("idle");
+    setProgress(0);
+    push({ kind: "info", title: "Render cancelled" });
+  }, [push]);
 
   const show = useCallback((item: HistoryItem) => {
-    abort.current?.abort(); stopTimer();
+    if (live.current && (status === "queued" || status === "generating")) return; // don't clobber a running job
     setError(null); setResult(item.result); setActiveId(item.id); setStatus("completed");
-  }, []);
+  }, [status]);
 
   const reset = useCallback(() => {
     setStatus("idle"); setResult(null); setError(null); setProgress(0); setStage(0);
   }, []);
 
-  return { status, stage, progress, result, error, history, activeId, show, generate, cancel, exportGif, reset };
+  return { status, stage, progress, elapsedMs, etaMs, result, error, history, activeId, show, generate, cancel, reset };
 }
+

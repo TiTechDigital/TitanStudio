@@ -1,40 +1,40 @@
-export type GenStatus = "idle" | "generating" | "completed" | "error";
-export type ModelId = "turbo" | "ultra" | "hybrid";
-export type AspectId = "9:16" | "16:9" | "1:1" | "2.39:1";
+export type GenStatus = "idle" | "queued" | "generating" | "completed" | "error";
+export type ModelId = "turbo" | "cinema" | "ultra";
+export type AspectId = "9:16" | "16:9";
+export type ResolutionId = "draft" | "hd" | "uhd";
+export type TtsEngine = "chattts" | "kokoro";
 
 export interface StudioParams {
   prompt: string;
-  negativePrompt: string;
   model: ModelId;
-  durationSec: 2 | 4 | 6 | 8 | 10;
-  fps: 24 | 30 | 60;
+  durationSec: number; // 2..10
+  autoDuration: boolean; // let the worker size the clip from the narration
   aspect: AspectId;
-  motion: number; // 1..10
-  upscale4k: boolean;
-  guidance: number; // 1..10
-  steps: number; // 12..40
-  seed: number;
-  lockSeed: boolean;
+  resolution: ResolutionId;
+  strength: number; // Wan V2V strength 0.3..0.9
+  steps: number; // Wan steps 8..30
   narration: string;
   voice: string;
-  speechRate: number; // -20..20 (%)
-  pitch: number; // -50..50 (Hz)
-  bgm: string;
-  bgmVolume: number; // 0..100
-  autoDuck: boolean;
+  ttsEngine: TtsEngine;
+  music: string; // BGM track id ("none" = no music)
 }
 
 export type SetParam = <K extends keyof StudioParams>(key: K, value: StudioParams[K]) => void;
+export type PatchParams = (patch: Partial<StudioParams>) => void;
 export interface StudioProps {
   p: StudioParams;
   set: SetParam;
+  patch: PatchParams;
 }
 
 export interface TitanResult {
-  videoUrl: string;
-  rawUrl?: string; // pre-upscale, for compare slider
-  url4k?: string;
-  seed: number;
+  videoUrl: string; // blob: URL
+  duration?: number;
+  resolution?: string;
+  voiceUsed?: string;
+  wanUsed?: boolean;
+  esrganUsed?: boolean;
+  workerSeconds?: number;
   elapsedMs: number;
 }
 

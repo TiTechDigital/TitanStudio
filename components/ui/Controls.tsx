@@ -4,7 +4,7 @@ import { Check, ChevronDown } from "lucide-react";
 
 export function Group({ title, aside, children }: { title: string; aside?: ReactNode; children: ReactNode }) {
   return (
-    <section className="border-b border-ink-700 px-5 py-5 last:border-b-0">
+    <section className="border-b border-white/[0.07] px-5 py-5 last:border-b-0">
       <div className="mb-4 flex items-center justify-between gap-3">
         <h3 className="text-[13px] font-semibold text-fg">{title}</h3>
         {aside}
@@ -57,8 +57,8 @@ export function Toggle({ checked, onChange, label, sub }: { checked: boolean; on
         <span className="block text-[13px] font-medium text-fg">{label}</span>
         {sub && <span className="mt-0.5 block text-[11.5px] text-mute">{sub}</span>}
       </span>
-      <span className={`relative h-[22px] w-10 shrink-0 rounded-full transition-colors ${checked ? "bg-lime" : "bg-ink-600"}`}>
-        <span className={`absolute top-[3px] h-4 w-4 rounded-full transition-all ${checked ? "left-[21px] bg-ink-950" : "left-[3px] bg-fg"}`} />
+      <span className={`relative h-[22px] w-10 shrink-0 rounded-full transition-colors ${checked ? "bg-accent" : "bg-ink-600"}`}>
+        <span className={`absolute top-[3px] h-4 w-4 rounded-full transition-all ${checked ? "left-[21px] bg-white" : "left-[3px] bg-fg"}`} />
       </span>
     </button>
   );
@@ -107,7 +107,7 @@ export function Menu({
         <ChevronDown size={12} className="text-mute" />
       </button>
       {open && (
-        <div role="menu" className={`absolute bottom-full left-0 z-40 mb-2 max-h-[60vh] overflow-y-auto rounded-xl border border-ink-600 bg-ink-800 p-1 shadow-2xl shadow-black/70 ${width}`}>
+        <div role="menu" className={`absolute bottom-full left-0 z-40 mb-2 max-h-[60vh] overflow-y-auto rounded-xl border border-white/10 bg-ink-800 p-1 shadow-2xl shadow-black/70 ${width}`}>
           {children(() => setOpen(false))}
         </div>
       )}
@@ -120,14 +120,14 @@ export function MenuItem({
 }: { active?: boolean; onClick: () => void; title: string; sub?: string; right?: ReactNode }) {
   return (
     <button type="button" role="menuitemradio" aria-checked={!!active} onClick={onClick}
-      className="flex w-full items-center justify-between gap-3 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-ink-700">
+      className="flex w-full items-center justify-between gap-3 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-white/[0.06]">
       <span className="min-w-0">
         <span className="block text-[13px] font-medium text-fg">{title}</span>
         {sub && <span className="block text-[11.5px] text-mute">{sub}</span>}
       </span>
       <span className="flex shrink-0 items-center gap-2 text-mute">
         {right}
-        {active && <Check size={14} className="text-lime" />}
+        {active && <Check size={14} className="text-accent-soft" />}
       </span>
     </button>
   );

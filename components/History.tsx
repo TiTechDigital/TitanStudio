@@ -4,17 +4,20 @@ import type { HistoryItem } from "@/lib/types";
 export function History({ items, activeId, onSelect }: { items: HistoryItem[]; activeId: number | null; onSelect: (i: HistoryItem) => void }) {
   if (!items.length) return null;
   return (
-    <ul className="flex shrink-0 gap-2 overflow-x-auto px-5 pb-3" aria-label="This session">
-      {items.map((it) => (
-        <li key={it.id} className="shrink-0">
+    <div className="shrink-0 px-4 pb-3">
+      <div className="flex gap-2.5 overflow-x-auto pb-1" role="list" aria-label="This session">
+        {items.map((it) => (
           <button
-            type="button" onClick={() => onSelect(it)} title={it.prompt}
-            className={`relative block h-14 w-24 overflow-hidden rounded-lg bg-ink-800 ring-1 transition ${it.id === activeId ? "ring-2 ring-lime" : "ring-white/10 hover:ring-white/40"}`}
+            key={it.id} type="button" role="listitem" onClick={() => onSelect(it)} title={it.prompt}
+            className={`group relative h-16 shrink-0 overflow-hidden rounded-xl border bg-ink-900 transition ${it.aspect === "9:16" ? "w-9" : "w-28"} ${
+              it.id === activeId ? "border-accent shadow-[0_0_20px_-4px_rgba(59,130,255,.9)]" : "border-white/10 opacity-70 hover:opacity-100"
+            }`}
           >
-            <video src={it.result.rawUrl ?? it.result.videoUrl} muted playsInline preload="metadata" className="h-full w-full object-cover" />
+            {/* #t=0.1 shows the first frame as a thumbnail */}
+            <video src={`${it.result.videoUrl}#t=0.1`} muted preload="metadata" playsInline className="h-full w-full object-cover" />
           </button>
-        </li>
-      ))}
-    </ul>
+        ))}
+      </div>
+    </div>
   );
 }

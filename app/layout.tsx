@@ -10,9 +10,9 @@ const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono", displ
 
 export const metadata: Metadata = {
   title: "Titan Studio",
-  description: "Generate video with voice-over and music from a single prompt.",
+  description: "Generate cinematic video with voice-over and music from a single prompt.",
 };
-export const viewport: Viewport = { themeColor: "#08080A", width: "device-width", initialScale: 1 };
+export const viewport: Viewport = { themeColor: "#04060C", width: "device-width", initialScale: 1 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
